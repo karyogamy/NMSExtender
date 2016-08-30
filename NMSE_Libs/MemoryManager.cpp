@@ -1,7 +1,7 @@
 #include "MemoryManager.h"
 
-MemoryManager global_Memory;
-MemoryManager local_Memory;
+MemoryManager *global_Memory = new MemoryManager();
+MemoryManager *local_Memory = new MemoryManager();
 
 MemoryManager::MemoryManager()
 	: m_addr(nullptr)
@@ -135,23 +135,25 @@ bool MemoryManager::ExecBranch(uintptr_t src, uintptr_t dst, uint8_t command, si
 		return false;
 	}
 
-	uintptr_t* rtMem = (uintptr_t*)(AllocateSpace(sizeof(void*))); 
+	uintptr_t* rtMem = (uintptr_t*)(AllocateSpace(sizeof(void*)));
 
 	if (!rtMem) return false;
 
 	//grab the relative jmp
 	uintptr_t rtMemAddr = (uintptr_t)rtMem;
-	uintptr_t nextByte = src + 6;
+	uintptr_t nextByte = src + 6; //adds the instr count for rip 
 	ptrdiff_t ripDiff = rtMemAddr - nextByte;
 
 	//null the bytes (your job to replace at the moment) -- use xbyak
-	//VirtualSet(src, 0x90, len); -- nyi
+	if (len > 6)
+		VirtualSet(src, 0x90, len);
 
 	uint8_t instr[6];
 	instr[0] = 0xff;
 	instr[1] = command;
 	*((sint32_t*)&instr[2]) = (sint32_t)ripDiff;
 	VirtualWrite(src, instr, sizeof(instr));
+
 	*rtMem = dst;
 
 	return true;
@@ -161,6 +163,7 @@ void* MemoryManager::AllocateSpace(size_t bytes){
 	if (m_addr){
 		if (bytes <= RemainingSpace()){
 			m_locAlloc = ((uint8_t*)(m_addr)) + m_bytesWritten;
+			m_bytesWritten += bytes;
 			return m_locAlloc;
 		}
 	}
